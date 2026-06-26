@@ -1,0 +1,1301 @@
+<!doctype html>
+<html class="light" lang="id" style="scroll-behavior: smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>GoldPredict AI | Institutional Research Terminal</title>
+    <!-- =====================================================================
+         External dependencies
+         · Tailwind CDN (with forms + container-queries plugins)
+         · Google Fonts: Inter (UI), Material Symbols (icons)
+         ===================================================================== -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <!-- =====================================================================
+         Tailwind theme config
+         Only includes tokens actually USED in this template. If you add a
+         new utility (e.g. text-info), declare its color here first.
+         ===================================================================== -->
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              // Brand & semantic
+              primary: "#000000",
+              "on-primary": "#ffffff",
+              secondary: "#585f6c",
+              tertiary: "#c99a2e", // gold accent
+              success: "#16a34a",
+
+              // Surfaces (light theme)
+              surface: "#ffffff",
+              "surface-bright": "#f9f9f9",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f3f3f3",
+              "surface-container": "#eeeeee",
+              "surface-container-high": "#e8e8e8",
+              "surface-variant": "#e2e2e2",
+
+              // Lines & text-on-surface
+              outline: "#747878",
+              "outline-variant": "#c4c7c7",
+              "on-surface": "#1a1c1c",
+              "on-surface-variant": "#444748",
+            },
+            borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem" },
+            spacing: {
+              gutter: "24px",
+              "margin-desktop": "32px",
+              "margin-mobile": "16px",
+              "container-max-width": "1440px",
+            },
+            // All UI text uses Inter; aliases below let us name roles
+            // (headline / body / label / numeric) in HTML instead of sizes.
+            fontFamily: {
+              "headline-xl": ["Inter"],
+              "headline-lg": ["Inter"],
+              "headline-md": ["Inter"],
+              "body-lg": ["Inter"],
+              "body-md": ["Inter"],
+              "body-sm": ["Inter"],
+              "label-caps": ["Inter"],
+              "numeric-tabular": ["Inter"],
+            },
+            fontSize: {
+              "headline-xl": [
+                "36px",
+                { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" },
+              ],
+              "headline-lg": [
+                "24px",
+                { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" },
+              ],
+              "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+              "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+              "label-caps": [
+                "11px",
+                { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" },
+              ],
+              "numeric-tabular": ["14px", { lineHeight: "20px", fontWeight: "500" }],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      /* =====================================================================
+         1. Base
+         ===================================================================== */
+      body {
+        background-color: #f5f5f5;
+        font-family: "Inter", sans-serif;
+        color: #1a1c1c;
+      }
+
+      /* Material Symbols default styling */
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+        vertical-align: middle;
+      }
+
+      /* WebGL background canvas (decorative, behind all content) */
+      canvas#bg-animation {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -10;
+        pointer-events: none;
+      }
+
+      /* =====================================================================
+         2. Components
+         ===================================================================== */
+
+      /* --- Card ----------------------------------------------------------- */
+      .academic-card {
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        padding: 24px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .gold-accent-top {
+        border-top: 3px solid #c99a2e;
+      }
+
+      /* --- Table ---------------------------------------------------------- */
+      .table-row-hover {
+        transition: background-color 0.2s ease;
+      }
+      .table-row-hover:hover {
+        background-color: #eeeeee;
+      }
+
+      /* --- Spinner -------------------------------------------------------- */
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #e5e7eb;
+        border-top-color: #000;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        vertical-align: middle;
+      }
+
+      /* --- Result calc chain --------------------------------------------- */
+      /* Renders: Close This → Lag 1 → Output → Adjusted (4-step pipeline) */
+      .calc-chain {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 0 2px;
+        border-top: 1px solid #e5e7eb;
+        flex-wrap: wrap;
+      }
+      .calc-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        flex: 1;
+        min-width: 80px;
+      }
+      .calc-step-lbl,
+      .calc-result-lbl {
+        font-size: 0.6rem;
+        color: #9ca3af;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        text-align: center;
+        line-height: 1.35;
+      }
+      .calc-step-val {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #111827;
+        text-align: center;
+      }
+      .calc-result-val {
+        font-size: 1rem;
+        font-weight: 800;
+        text-align: center;
+      }
+      .calc-arrow {
+        font-size: 1.1rem;
+        color: #d1d5db;
+        flex-shrink: 0;
+        margin-bottom: 14px;
+      }
+
+      /* =====================================================================
+         3. Utilities
+         ===================================================================== */
+      .text-up {
+        color: #16a34a;
+      }
+      .text-down {
+        color: #dc2626;
+      }
+
+      /* Stagger animation delays (replaces inline style="animation-delay:…") */
+      .delay-1 { animation-delay: 0.1s; }
+      .delay-2 { animation-delay: 0.2s; }
+      .delay-3 { animation-delay: 0.3s; }
+      .delay-4 { animation-delay: 0.4s; }
+      .delay-5 { animation-delay: 0.5s; }
+      .delay-6 { animation-delay: 0.6s; }
+      .delay-7 { animation-delay: 0.7s; }
+      .delay-8 { animation-delay: 0.8s; }
+      .delay-9 { animation-delay: 0.9s; }
+
+      /* =====================================================================
+         4. Animations
+         Wrapped in prefers-reduced-motion so users who opt out of motion
+         get a static UI (card hover & fade-ins disabled).
+         ===================================================================== */
+      @media (prefers-reduced-motion: no-preference) {
+        .academic-card:hover {
+          border-color: #c99a2e;
+          transform: scale(1.02);
+          box-shadow:
+            0 10px 25px -5px rgba(0, 0, 0, 0.1),
+            0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up {
+          animation: fade-in-up 0.6s ease-out forwards;
+          opacity: 0;
+        }
+        @keyframes pulse-soft {
+          0%, 100% { opacity: 1;   transform: scale(1); }
+          50%      { opacity: 0.8; transform: scale(1.05); }
+        }
+        .animate-pulse-soft {
+          animation: pulse-soft 2s infinite ease-in-out;
+        }
+        .scroll-reveal {
+          opacity: 0;
+        }
+        .scroll-reveal.visible {
+          animation: fade-in-up 0.6s ease-out forwards;
+        }
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body class="flex flex-col min-h-screen">
+    <!-- Decorative WebGL background — see "WebGL background" script block -->
+    <canvas id="bg-animation"></canvas>
+
+    <!-- =====================================================================
+         SECTION 1 · Top navigation
+         Sticky brand + section anchors. Scroll-spy highlights active link.
+         ===================================================================== -->
+    <header
+      class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-desktop bg-surface border-b border-outline-variant h-16"
+    >
+      <div class="flex items-center gap-3 font-headline-lg text-headline-lg font-bold text-primary">
+        <div class="h-8 w-auto flex items-center">
+          <img
+            alt="XAU/USD Logo"
+            class="h-full w-auto"
+            src="{{ url_for('static', filename='logo web.svg') }}"
+          />
+        </div>
+        <span>Prediksi Harga Emas Mingguan</span>
+      </div>
+      <nav class="hidden md:flex items-center gap-8" id="main-nav">
+        <a
+          class="nav-link font-body-md text-body-md text-primary border-b-2 border-primary pb-1 transition-colors"
+          href="#dashboard"
+          data-section="dashboard"
+          >Dashboard</a
+        >
+        <a
+          class="nav-link font-body-md text-body-md text-secondary hover:text-primary transition-colors border-b-2 border-transparent pb-1"
+          href="#model-histori"
+          data-section="model-histori"
+          >Model Histori</a
+        >
+        <a
+          class="nav-link font-body-md text-body-md text-secondary hover:text-primary transition-colors border-b-2 border-transparent pb-1"
+          href="#price-histori"
+          data-section="price-histori"
+          >Price Histori</a
+        >
+        <a
+          class="nav-link font-body-md text-body-md text-secondary hover:text-primary transition-colors border-b-2 border-transparent pb-1"
+          href="#tentang"
+          data-section="tentang"
+          >Tentang</a
+        >
+      </nav>
+    </header>
+
+    <div class="flex flex-1">
+      <main
+        class="flex-1 ml-0 p-margin-mobile md:p-margin-desktop bg-transparent max-w-container-max-width mx-auto"
+      >
+        <!-- =================================================================
+             SECTION 2 · Hero header
+             Title, subtitle, tag chips, and live model confidence (right).
+             ================================================================= -->
+        <section class="mb-8 animate-fade-up" id="dashboard">
+          <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h1 class="font-headline-xl text-headline-xl text-primary">
+                Gold Forecasting Dashboard
+              </h1>
+              <p class="font-body-lg text-body-lg text-secondary mt-1 max-w-2xl">
+                Estimasi close mingguan berbasis LSTM, data GC=F, FFR, dan NFP.
+              </p>
+              <div class="flex flex-wrap gap-2 mt-4">
+                <span
+                  class="px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-sm"
+                  >LSTM</span
+                >
+                <span
+                  class="px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-sm"
+                  >WEEKLY</span
+                >
+                <span
+                  class="px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-sm"
+                  >GC=F</span
+                >
+                <span
+                  class="px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-sm"
+                  >YFINANCE</span
+                >
+                <span
+                  class="px-3 py-1 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps rounded-sm"
+                  >FRED</span
+                >
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-label-caps text-label-caps text-secondary uppercase tracking-widest">
+                Model Confidence
+              </div>
+              <div
+                class="font-headline-lg text-headline-lg text-success animate-pulse-soft"
+                id="dynamic-confidence"
+              >
+                —
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             SECTION 3 · Market status strip
+             Populated by /auto-ohlc on user click. Empty state shows "—".
+             ================================================================= -->
+        <section class="mb-gutter">
+          <div
+            class="flex flex-col md:flex-row items-center bg-surface border border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant"
+          >
+            <div class="flex-1 p-4 text-center animate-fade-up delay-1">
+              <div class="font-label-caps text-label-caps text-secondary">CURRENT CLOSE</div>
+              <div
+                class="font-numeric-tabular text-headline-md font-bold text-primary"
+                id="strip-close"
+              >
+                —
+              </div>
+            </div>
+            <div class="flex-1 p-4 text-center animate-fade-up delay-2">
+              <div class="font-label-caps text-label-caps text-secondary">LAST WEEK CLOSE</div>
+              <div
+                class="font-numeric-tabular text-headline-md font-bold text-primary"
+                id="strip-lag1"
+              >
+                —
+              </div>
+            </div>
+            <div class="flex-1 p-4 text-center animate-fade-up delay-3">
+              <div class="font-label-caps text-label-caps text-secondary">2 WEEKS AGO</div>
+              <div
+                class="font-numeric-tabular text-headline-md font-bold text-primary"
+                id="strip-lag2"
+              >
+                —
+              </div>
+            </div>
+            <div class="flex-1 p-4 text-center bg-surface-container-low animate-fade-up delay-4">
+              <div class="font-label-caps text-label-caps text-secondary">DATA DATE</div>
+              <div
+                class="font-numeric-tabular text-headline-md font-bold text-primary"
+                id="strip-date"
+              >
+                —
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             SECTION 4 · Prediction workspace
+             Two-column layout:
+               · Left  → input form (FFR, NFP) + fetch OHLC button
+               · Right → result card with calc chain pipeline
+             ================================================================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-gutter mb-gutter">
+          <!-- Left column: forecast parameters -->
+          <div class="lg:col-span-5 academic-card animate-fade-up delay-4">
+            <h2 class="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+              <span class="material-symbols-outlined text-tertiary">tune</span>
+              Forecast Parameters
+            </h2>
+            <div class="space-y-6">
+              <!-- Status OHLC -->
+              <div id="ohlc-status" class="hidden text-xs px-3 py-2 rounded border"></div>
+
+              <!-- Fetch Button -->
+              <button
+                id="btn-fetch-ohlc"
+                class="w-full flex items-center justify-center gap-2 bg-surface-container-high border border-outline-variant py-3 font-label-caps text-label-caps hover:bg-outline-variant transition-colors active:scale-95"
+              >
+                <span class="material-symbols-outlined text-body-md">refresh</span>
+                AMBIL DATA OHLC TERBARU
+              </button>
+
+              <!-- Inputs -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Current Price (readonly, from fetch) -->
+                <div class="md:col-span-2">
+                  <label class="font-label-caps text-label-caps text-secondary block mb-2"
+                    >CURRENT PRICE ($)</label
+                  >
+                  <input
+                    id="inp-close"
+                    class="w-full bg-surface-bright border border-outline-variant p-3 focus:ring-0 focus:border-primary text-body-md"
+                    type="number"
+                    step="0.01"
+                    placeholder="Auto dari fetch..."
+                  />
+                </div>
+
+                <!-- FFR -->
+                <div class="md:col-span-2 grid grid-cols-2 gap-4 items-end">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="font-label-caps text-label-caps text-secondary"
+                        >FFR SAAT INI (%)</label
+                      >
+                      <a
+                        href="https://www.investing.com/economic-calendar/interest-rate-decision-168"
+                        target="_blank"
+                        class="text-primary hover:text-tertiary flex items-center gap-1"
+                      >
+                        <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                      </a>
+                    </div>
+                    <div class="relative">
+                      <input
+                        id="inp-ffr"
+                        class="w-full bg-surface-bright border border-outline-variant p-3 focus:ring-0 focus:border-primary text-body-md"
+                        type="number"
+                        step="0.01"
+                        value="4.5"
+                      />
+                      <span
+                        class="absolute right-3 top-3 material-symbols-outlined text-on-surface-variant text-body-md"
+                        >percent</span
+                      >
+                    </div>
+                  </div>
+                  <div>
+                    <div class="mb-2">
+                      <label class="font-label-caps text-label-caps text-secondary"
+                        >FFR SEBELUMNYA (%)</label
+                      >
+                    </div>
+                    <div class="relative">
+                      <input
+                        id="inp-ffr-prev"
+                        class="w-full bg-surface-bright border border-outline-variant p-3 focus:ring-0 focus:border-primary text-body-md"
+                        type="number"
+                        step="0.01"
+                        value="4.5"
+                      />
+                      <span
+                        class="absolute right-3 top-3 material-symbols-outlined text-on-surface-variant text-body-md"
+                        >percent</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <!-- NFP -->
+                <div class="md:col-span-2">
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="font-label-caps text-label-caps text-secondary"
+                      >NON-FARM PAYROLL (NFP)</label
+                    >
+                    <a
+                      href="https://www.investing.com/economic-calendar/nonfarm-payrolls-227"
+                      target="_blank"
+                      class="text-primary hover:text-tertiary flex items-center gap-1"
+                    >
+                      <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                    </a>
+                  </div>
+                  <div class="relative">
+                    <input
+                      id="inp-nfp"
+                      class="w-full bg-surface-bright border border-outline-variant p-3 focus:ring-0 focus:border-primary text-body-md"
+                      type="number"
+                      step="1"
+                      value="134000"
+                    />
+                    <span
+                      class="absolute right-3 top-3 material-symbols-outlined text-on-surface-variant text-body-md"
+                      >group</span
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- Predict Button -->
+              <button
+                id="btn-predict"
+                class="w-full bg-primary text-on-primary py-4 font-headline-md text-headline-md uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                Jalankan Prediksi
+              </button>
+
+              <!-- Error box -->
+              <div
+                id="pred-error"
+                class="hidden text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Right column: prediction result -->
+          <div
+            class="lg:col-span-7 academic-card gold-accent-top flex flex-col justify-start relative overflow-hidden animate-fade-up delay-5"
+          >
+            <div class="relative z-10">
+              <div class="font-headline-md text-headline-md text-primary font-semibold mb-4">
+                Hasil Prediksi
+              </div>
+
+              <!-- Placeholder state -->
+              <div id="res-placeholder" class="py-6 text-center text-secondary">
+                <span class="material-symbols-outlined text-4xl text-outline-variant block mb-2"
+                  >query_stats</span
+                >
+                <span class="font-body-md text-body-md"
+                  >Klik "Jalankan Prediksi" untuk melihat hasil</span
+                >
+              </div>
+
+              <!-- Result state (hidden until predict) -->
+              <div id="res-content" class="hidden">
+                <!-- Big price -->
+                <div
+                  class="font-bold text-primary leading-none"
+                  style="font-size: 3rem; letter-spacing: -0.03em; line-height: 1"
+                  id="res-price"
+                >
+                  —
+                </div>
+
+                <!-- Direction badge -->
+                <div class="flex items-center gap-2 mt-3 mb-4">
+                  <div
+                    class="font-semibold"
+                    style="font-size: 1.35rem; line-height: 1.3"
+                    id="res-direction"
+                  >
+                    —
+                  </div>
+                  <span id="res-direction-icon" class="text-2xl"></span>
+                </div>
+
+                <!-- SVG tren chart -->
+                <div id="pred-chart-wrap" class="w-full mb-4 rounded-lg overflow-hidden hidden">
+                  <img
+                    id="pred-chart"
+                    src=""
+                    alt="tren chart"
+                    style="width: 100%; height: auto; display: block"
+                  />
+                </div>
+
+                <!-- Calc chain -->
+                <div class="calc-chain" id="calc-chain">
+                  <div class="calc-step">
+                    <div class="calc-step-lbl">Harga Saat Ini<br />(Close This)</div>
+                    <div class="calc-step-val" id="cc-close-this">—</div>
+                  </div>
+                  <div class="calc-arrow">→</div>
+                  <div class="calc-step">
+                    <div class="calc-step-lbl">Acuan Model<br />(Close Lag 1)</div>
+                    <div class="calc-step-val" id="cc-lag1">—</div>
+                  </div>
+                  <div class="calc-arrow">→</div>
+                  <div class="calc-step">
+                    <div class="calc-step-lbl">Output Model<br />(vs Lag 1)</div>
+                    <div class="calc-step-val" id="cc-output">—</div>
+                  </div>
+                  <div class="calc-arrow">→</div>
+                  <div class="calc-step">
+                    <div class="calc-result-lbl">Prediksi Adjusted<br />(vs Close This)</div>
+                    <div class="calc-result-val" id="cc-adjusted">—</div>
+                    <div class="font-label-caps text-label-caps" id="cc-delta">—</div>
+                  </div>
+                </div>
+
+                <p class="mt-3 text-[0.65rem] text-gray-400 leading-relaxed">
+                  * Prediksi adjusted = Close This + (Output Model − Lag 1) · Arah dihitung dari
+                  selisih ini terhadap harga saat ini.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             SECTION 5 · Model performance (backtest)
+             Metric cards + 10-week backtest table. Loaded on user click,
+             not auto, so we don't burn /model-history calls per page load.
+             ================================================================= -->
+        <section class="mb-gutter" id="model-histori">
+          <h2 class="font-headline-md text-headline-md mb-6 animate-fade-up">
+            Model Performance Analysis
+          </h2>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-gutter">
+            <div class="academic-card p-4 text-center animate-fade-up delay-6">
+              <div class="font-label-caps text-label-caps text-secondary">AKURASI ARAH</div>
+              <div class="font-headline-lg text-headline-lg text-primary" id="accuracy-stat">—</div>
+            </div>
+            <div class="academic-card p-4 text-center animate-fade-up delay-7">
+              <div class="font-label-caps text-label-caps text-secondary">MAPE</div>
+              <div class="font-headline-lg text-headline-lg text-primary" id="mape-stat">—</div>
+            </div>
+            <div class="academic-card p-4 text-center animate-fade-up delay-8">
+              <div class="font-label-caps text-label-caps text-secondary">MAE</div>
+              <div class="font-headline-lg text-headline-lg text-primary" id="mae-stat">—</div>
+            </div>
+            <div class="academic-card p-4 text-center animate-fade-up delay-9">
+              <div class="font-label-caps text-label-caps text-secondary">RMSE</div>
+              <div class="font-headline-lg text-headline-lg text-primary" id="rmse-stat">—</div>
+            </div>
+          </div>
+
+          <div class="academic-card p-0 overflow-hidden scroll-reveal">
+            <div
+              class="px-6 py-4 border-b border-outline-variant bg-surface-container-lowest flex justify-between items-center"
+            >
+              <h3 class="font-headline-md text-headline-md">Live Backtest Table</h3>
+              <button
+                id="btn-load-history"
+                class="px-3 py-1.5 border border-outline-variant rounded-sm font-label-caps text-label-caps text-secondary hover:bg-surface-container-high hover:text-primary transition-colors active:scale-95 flex items-center gap-2"
+              >
+                <span class="material-symbols-outlined text-[16px]">history</span>
+                MUAT HISTORI MODEL
+              </button>
+            </div>
+            <div
+              id="backtest-loading"
+              class="hidden px-6 py-8 text-center text-secondary font-body-md"
+            >
+              <span class="spinner"></span> Memuat data backtest...
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse" id="backtest-table">
+                <thead>
+                  <tr class="bg-surface-container-high border-b border-outline-variant">
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary">Date</th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      Close Acuan ($)
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      Prediksi Close ($)
+                    </th>
+                    <th
+                      class="px-6 py-3 font-label-caps text-label-caps text-secondary text-center"
+                    >
+                      Pred Arah
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      Actual Close ($)
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      Error ($)
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      Error (%)
+                    </th>
+                    <th
+                      class="px-6 py-3 font-label-caps text-label-caps text-secondary text-center"
+                    >
+                      Actual Arah
+                    </th>
+                    <th
+                      class="px-6 py-3 font-label-caps text-label-caps text-secondary text-center"
+                    >
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="backtest-tbody" class="divide-y divide-outline-variant">
+                  <tr>
+                    <td colspan="9" class="px-6 py-8 text-center text-secondary font-body-md">
+                      Klik "Muat Histori Model" untuk memuat data.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             SECTION 6 · Price history table
+             Auto-loaded on page load (DOMContentLoaded → loadPriceHistory).
+             ================================================================= -->
+        <section class="mb-margin-desktop" id="price-histori">
+          <h2 class="font-headline-md text-headline-md mb-6">Market Snapshot: Historical OHLC</h2>
+          <div class="academic-card p-0 scroll-reveal">
+            <div
+              class="px-6 py-4 border-b border-outline-variant bg-surface-container-lowest flex justify-between items-center"
+            >
+              <h3 class="font-headline-md text-headline-md">Price History (6 Bulan Terakhir)</h3>
+              <div
+                id="price-hist-loading"
+                class="text-secondary font-label-caps text-label-caps flex items-center gap-2"
+              >
+                <span class="spinner"></span> Memuat...
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-surface-container-high border-b border-outline-variant">
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary">
+                      PERIOD END
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      OPEN
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      HIGH
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      LOW
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      CLOSE
+                    </th>
+                    <th class="px-6 py-3 font-label-caps text-label-caps text-secondary text-right">
+                      VOLUME
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="price-hist-tbody" class="divide-y divide-outline-variant">
+                  <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-secondary font-body-md">
+                      Memuat data harga...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             SECTION 7 · About / model explanation
+             Static documentation. Not driven by any endpoint.
+             ================================================================= -->
+        <section class="mb-margin-desktop grid grid-cols-1 gap-gutter" id="tentang">
+          <div class="academic-card scroll-reveal">
+            <h2 class="font-headline-md text-headline-md mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined text-tertiary">neurology</span>
+              Keterangan Model
+            </h2>
+            <p class="font-label-caps text-label-caps text-secondary mb-6">
+              Ringkasan cara kerja prediksi dan evaluasi arah
+            </p>
+            <div class="space-y-6">
+              <p class="font-body-md text-body-md text-secondary leading-relaxed">
+                Sistem ini menggunakan model Long Short-Term Memory (LSTM) untuk memprediksi harga
+                penutupan emas mingguan. Data harga diambil dari GC=F melalui yfinance, lalu fitur
+                harga dibentuk dalam rasio terhadap close minggu sebelumnya agar model lebih fokus
+                pada pola perubahan, bukan angka harga absolut.
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-1">
+                  <div class="font-label-caps text-label-caps text-primary font-bold">
+                    Input Harga
+                  </div>
+                  <p class="font-body-sm text-body-sm text-secondary">
+                    OHLC mingguan GC=F, close minggu lalu, dan close dua minggu lalu.
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <div class="font-label-caps text-label-caps text-primary font-bold">
+                    Variabel Makro
+                  </div>
+                  <p class="font-body-sm text-body-sm text-secondary">
+                    Federal Funds Rate, perubahan FFR, dan Non-Farm Payroll.
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <div class="font-label-caps text-label-caps text-primary font-bold">
+                    Target Model
+                  </div>
+                  <p class="font-body-sm text-body-sm text-secondary">
+                    Model mempelajari rasio
+                    <code class="bg-surface-container px-1 rounded text-xs"
+                      >y_ratio = target close / close_lag1</code
+                    >.
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <div class="font-label-caps text-label-caps text-primary font-bold">
+                    Evaluasi Web
+                  </div>
+                  <p class="font-body-sm text-body-sm text-secondary">
+                    Status benar/salah dihitung dari arah close minggu kemarin (lag1) menuju actual
+                    close minggu berikutnya.
+                  </p>
+                </div>
+              </div>
+              <p
+                class="font-body-sm text-body-sm text-secondary italic border-t border-outline-variant pt-4"
+              >
+                <strong>Catatan:</strong> hasil prediksi menunjukkan estimasi arah dan harga
+                penutupan mingguan berdasarkan data historis serta variabel makro yang digunakan
+                model. Evaluasi arah pada tabel backtest dibuat agar lebih mudah dibaca secara
+                praktis, yaitu membandingkan prediksi dan aktual terhadap close minggu berjalan.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- =====================================================================
+         SECTION 8 · Footer
+         Copyright + external source links.
+         ===================================================================== -->
+    <footer
+      class="w-full py-8 px-margin-desktop flex flex-col md:flex-row justify-between items-center gap-4 mt-auto bg-surface-container-lowest border-t border-outline-variant"
+    >
+      <div class="font-label-caps text-label-caps tracking-widest text-primary">
+        © 2026 Gold Forecaster · LSTM Weekly Prediction · Bukan saran investasi.
+      </div>
+      <div class="flex gap-6">
+        <a
+          class="font-body-sm text-body-sm text-secondary hover:text-primary transition-colors"
+          href="#"
+          >yfinance</a
+        >
+        <a
+          class="font-body-sm text-body-sm text-secondary hover:text-primary transition-colors"
+          href="#"
+          >FRED</a
+        >
+        <a
+          class="font-body-sm text-body-sm text-secondary hover:text-primary transition-colors"
+          href="#"
+          >Investing.com</a
+        >
+        <a
+          class="font-body-sm text-body-sm text-secondary hover:text-primary transition-colors"
+          href="#"
+          >Legal Disclaimer</a
+        >
+      </div>
+    </footer>
+
+    <!-- =====================================================================
+         WebGL background
+         Decorative noise pattern. Self-contained IIFE, exits silently if
+         WebGL is unavailable.
+         ===================================================================== -->
+    <script>
+      (function () {
+        const canvas = document.getElementById("bg-animation");
+        const gl = canvas.getContext("webgl");
+        if (!gl) return;
+        const vsSource = `attribute vec4 a_position; attribute vec2 a_texCoord; varying vec2 v_texCoord; void main(){gl_Position=a_position;v_texCoord=a_texCoord;}`;
+        const fsSource = `precision highp float; uniform float u_time; uniform vec2 u_resolution; varying vec2 v_texCoord; void main(){vec2 uv=v_texCoord; float noise=sin(uv.x*3.0+u_time*.5)*cos(uv.y*2.0-u_time*.3); noise+=sin(uv.y*5.0+u_time*.8)*.5; vec3 goldBase=vec3(.788,.604,.180); vec3 surfaceColor=vec3(.976,.976,.965); float mixFactor=clamp(noise*.03+.01,0.,1.); vec3 finalColor=mix(surfaceColor,goldBase,mixFactor); gl_FragColor=vec4(finalColor,.05);}`;
+        function createShader(gl, type, src) {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          return s;
+        }
+        const program = gl.createProgram();
+        gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+        gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+        const pos = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+        const pb = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pb);
+        gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+        const tc = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
+        const tb = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tb);
+        gl.bufferData(gl.ARRAY_BUFFER, tc, gl.STATIC_DRAW);
+        const pLoc = gl.getAttribLocation(program, "a_position");
+        gl.enableVertexAttribArray(pLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, pb);
+        gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
+        const tLoc = gl.getAttribLocation(program, "a_texCoord");
+        gl.enableVertexAttribArray(tLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, tb);
+        gl.vertexAttribPointer(tLoc, 2, gl.FLOAT, false, 0, 0);
+        const uTime = gl.getUniformLocation(program, "u_time");
+        const uRes = gl.getUniformLocation(program, "u_resolution");
+        function render(t) {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          gl.viewport(0, 0, canvas.width, canvas.height);
+          gl.uniform1f(uTime, t * 0.001);
+          gl.uniform2f(uRes, canvas.width, canvas.height);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+          requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+      })();
+    </script>
+
+    <!-- =====================================================================
+         Main app logic
+         Sections in order:
+           1. State                — single shared OHLC payload
+           2. Helpers              — formatters & UI status setters
+           3. Fetch OHLC           — populates form + market strip
+           4. Predict              — runs LSTM inference via /predict
+           5. Result rendering     — fills calc chain + trend chart
+           6. Model history        — backtest table + 4 metric cards
+           7. Price history        — auto-loaded on page load
+           8. Page init            — scroll-spy nav + scroll reveal
+         ===================================================================== -->
+    <script>
+      // ─────────────────────────────────────────────────────────────────────
+      // 1. State
+      // ─────────────────────────────────────────────────────────────────────
+      let ohlcData = null; // payload from /auto-ohlc; required before /predict
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 2. Helpers
+      // ─────────────────────────────────────────────────────────────────────
+      function fmt(n, d = 2) {
+        return n == null
+          ? "—"
+          : Number(n).toLocaleString("en-US", {
+              minimumFractionDigits: d,
+              maximumFractionDigits: d,
+            });
+      }
+      function fmtDate(s) {
+        if (!s) return "—";
+        const d = new Date(s + "T00:00:00");
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      }
+      function fmtVol(v) {
+        if (v == null) return "—";
+        if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+        if (v >= 1e3) return (v / 1e3).toFixed(0) + "k";
+        return String(v);
+      }
+      function setOhlcStatus(msg, isError = false) {
+        const el = document.getElementById("ohlc-status");
+        el.textContent = msg;
+        el.className = `text-xs px-3 py-2 rounded border ${isError ? "text-red-700 bg-red-50 border-red-200" : "text-green-700 bg-green-50 border-green-200"}`;
+        el.classList.remove("hidden");
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 3. Fetch OHLC (button: btn-fetch-ohlc)
+      //    Pulls latest weekly GC=F candles from /auto-ohlc, fills the
+      //    current-price input, and populates the market status strip.
+      // ─────────────────────────────────────────────────────────────────────
+      async function fetchOhlc() {
+        const btn = document.getElementById("btn-fetch-ohlc");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Mengambil data...';
+        try {
+          const res = await fetch("/auto-ohlc");
+          const d = await res.json();
+          if (d.status !== "ok") {
+            setOhlcStatus("Error: " + d.message, true);
+            return;
+          }
+          ohlcData = d;
+
+          // Fill input fields
+          document.getElementById("inp-close").value = d.close;
+
+          // Market strip
+          document.getElementById("strip-close").textContent = "$" + fmt(d.close);
+          document.getElementById("strip-lag1").textContent = "$" + fmt(d.close_lag1);
+          document.getElementById("strip-lag2").textContent = "$" + fmt(d.close_lag2);
+          document.getElementById("strip-date").textContent = fmtDate(d.date);
+
+          setOhlcStatus(`✓ Data berhasil diambil · ${d.date} (GC=F Weekly)`);
+        } catch (e) {
+          setOhlcStatus("Gagal terhubung ke server: " + e.message, true);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML =
+            '<span class="material-symbols-outlined text-body-md">refresh</span> AMBIL DATA OHLC TERBARU';
+        }
+      }
+
+      document.getElementById("btn-fetch-ohlc").addEventListener("click", fetchOhlc);
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 4. Predict (button: btn-predict)
+      //    Requires `ohlcData` (fetched above) + FFR/FFR_prev/NFP from form.
+      //    Posts to /predict, then hands payload to showResult().
+      // ─────────────────────────────────────────────────────────────────────
+      document.getElementById("btn-predict").addEventListener("click", async () => {
+        const errBox = document.getElementById("pred-error");
+        errBox.classList.add("hidden");
+
+        if (!ohlcData) {
+          errBox.textContent =
+            'Ambil data OHLC terlebih dahulu dengan klik tombol "Ambil Data OHLC Terbaru".';
+          errBox.classList.remove("hidden");
+          return;
+        }
+
+        const ffr = parseFloat(document.getElementById("inp-ffr").value);
+        const ffrPrev = parseFloat(document.getElementById("inp-ffr-prev").value);
+        const nfp = parseFloat(document.getElementById("inp-nfp").value);
+
+        if (isNaN(ffr) || isNaN(ffrPrev) || isNaN(nfp)) {
+          errBox.textContent = "Pastikan semua input FFR dan NFP sudah diisi dengan angka.";
+          errBox.classList.remove("hidden");
+          return;
+        }
+
+        const btn = document.getElementById("btn-predict");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Memproses...';
+
+        try {
+          const res = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ffr,
+              ffr_prev: ffrPrev,
+              nfp,
+              ohlc_sequence: ohlcData.ohlc_sequence,
+            }),
+          });
+          const d = await res.json();
+          if (d.status !== "ok") {
+            errBox.textContent = "Error: " + d.message;
+            errBox.classList.remove("hidden");
+            return;
+          }
+          showResult(d);
+        } catch (e) {
+          errBox.textContent = "Gagal menghubungi server: " + e.message;
+          errBox.classList.remove("hidden");
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "Jalankan Prediksi";
+        }
+      });
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 5. Result rendering
+      //    Swaps placeholder for content, fills calc chain, renders trend SVG.
+      // ─────────────────────────────────────────────────────────────────────
+      function showResult(d) {
+        document.getElementById("res-placeholder").classList.add("hidden");
+        document.getElementById("res-content").classList.remove("hidden");
+
+        const isUp = d.is_up;
+        const colorClass = isUp ? "text-up" : "text-down";
+
+        // Big price
+        document.getElementById("res-price").textContent = "$" + fmt(d.adjusted_price);
+
+        // Direction
+        const dirEl = document.getElementById("res-direction");
+        dirEl.textContent = isUp ? "Tren UP (Bullish)" : "Tren DOWN (Bearish)";
+        dirEl.className = "font-headline-md text-headline-md font-semibold " + colorClass;
+
+        // Calc chain
+        document.getElementById("cc-close-this").textContent = "$" + fmt(d.last_close);
+        document.getElementById("cc-lag1").textContent = "$" + fmt(d.close_lag1);
+        document.getElementById("cc-output").textContent = "$" + fmt(d.pred);
+        const adjEl = document.getElementById("cc-adjusted");
+        adjEl.textContent = "$" + fmt(d.adjusted_price);
+        adjEl.className = "calc-result-val " + colorClass;
+        const sign = d.delta >= 0 ? "+" : "";
+        document.getElementById("cc-delta").textContent =
+          `(${sign}$${fmt(Math.abs(d.delta))} / ${sign}${d.delta_pct.toFixed(2)}%)`;
+        document.getElementById("cc-delta").className =
+          "font-label-caps text-label-caps " + colorClass;
+
+        // Chart
+        renderPredChart(d);
+      }
+
+      function renderPredChart(d) {
+        const wrap = document.getElementById("pred-chart-wrap");
+        const img = document.getElementById("pred-chart");
+        img.src = d.is_up
+          ? "{{ url_for('static', filename='trenup.svg') }}"
+          : "{{ url_for('static', filename='trendown.svg') }}";
+        wrap.classList.remove("hidden");
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 6. Model history (button: btn-load-history)
+      //    Pulls last-10-week live backtest from /model-history. Updates
+      //    the 4 metric cards (accuracy / MAPE / MAE / RMSE) and table.
+      // ─────────────────────────────────────────────────────────────────────
+      document.getElementById("btn-load-history").addEventListener("click", loadModelHistory);
+
+      async function loadModelHistory() {
+        const btn = document.getElementById("btn-load-history");
+        const loadingEl = document.getElementById("backtest-loading");
+        const tbody = document.getElementById("backtest-tbody");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Memuat...';
+        loadingEl.classList.remove("hidden");
+        tbody.innerHTML = "";
+
+        try {
+          const res = await fetch("/model-history");
+          const d = await res.json();
+          if (d.status !== "ok") {
+            tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">${d.message}</td></tr>`;
+            return;
+          }
+
+          // Update stats
+          document.getElementById("accuracy-stat").textContent = d.accuracy + "%";
+          document.getElementById("mape-stat").textContent = d.mape + "%";
+          document.getElementById("mae-stat").textContent = fmt(d.mae, 2);
+          document.getElementById("rmse-stat").textContent = fmt(d.rmse, 2);
+          document.getElementById("dynamic-confidence").textContent = `High (${d.accuracy}%)`;
+
+          // Render rows
+          tbody.innerHTML = d.rows
+            .map((r) => {
+              const isUp = r.pred_direction === "Naik";
+              const dirColor = isUp ? "text-green-600" : "text-red-600";
+              const actualUp = r.actual_direction === "Naik";
+              const actualColor = actualUp ? "text-green-600" : "text-red-600";
+              const isBenar = r.status === "Benar";
+              return `
+        <tr class="table-row-hover">
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-primary">${r.date}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-primary">${fmt(r.close_lag1)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-primary">${fmt(r.pred_close)}</td>
+          <td class="px-6 py-4 text-center"><span class="font-bold ${dirColor}">${isUp ? "▲" : "▼"} ${r.pred_direction}</span></td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-primary">${fmt(r.actual_close)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-secondary">${fmt(r.abs_error)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-secondary">${r.abs_error_pct}%</td>
+          <td class="px-6 py-4 text-center"><span class="font-bold ${actualColor}">${actualUp ? "▲" : "▼"} ${r.actual_direction}</span></td>
+          <td class="px-6 py-4 text-center">
+            <span class="px-3 py-1 ${isBenar ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"} rounded-sm font-label-caps text-label-caps">
+              ${isBenar ? "✓ Benar" : "✗ Salah"}
+            </span>
+          </td>
+        </tr>`;
+            })
+            .join("");
+        } catch (e) {
+          tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">Gagal memuat: ${e.message}</td></tr>`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML =
+            '<span class="material-symbols-outlined text-[16px]">history</span> MUAT HISTORI MODEL';
+          loadingEl.classList.add("hidden");
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 7. Price history (auto-loaded on DOMContentLoaded)
+      //    Renders the 6-month OHLC table at the bottom of the page.
+      // ─────────────────────────────────────────────────────────────────────
+      async function loadPriceHistory() {
+        const loadEl = document.getElementById("price-hist-loading");
+        const tbody = document.getElementById("price-hist-tbody");
+        try {
+          const res = await fetch("/price-history");
+          const d = await res.json();
+          loadEl.classList.add("hidden");
+          if (d.status !== "ok") {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-600">${d.message}</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = d.rows
+            .map(
+              (r) => `
+        <tr class="table-row-hover">
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-primary">${fmtDate(r.date)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right">$${fmt(r.open)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right">$${fmt(r.high)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right">$${fmt(r.low)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right font-bold text-primary">$${fmt(r.close)}</td>
+          <td class="px-6 py-4 font-numeric-tabular text-body-md text-right text-secondary">${fmtVol(r.volume)}</td>
+        </tr>`,
+            )
+            .join("");
+        } catch (e) {
+          loadEl.classList.add("hidden");
+          tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-600">Gagal memuat: ${e.message}</td></tr>`;
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────────────
+      // 8. Page init
+      //    Runs once on DOMContentLoaded:
+      //      a. Kick off price-history fetch
+      //      b. Scroll-reveal observer (fades in `.scroll-reveal` elements)
+      //      c. Scroll-spy that highlights the active nav link by section
+      // ─────────────────────────────────────────────────────────────────────
+      document.addEventListener("DOMContentLoaded", () => {
+        // a. Initial data
+        loadPriceHistory();
+
+        // b. Scroll-reveal
+        const obs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add("visible");
+                obs.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.1 },
+        );
+        document.querySelectorAll(".scroll-reveal").forEach((el) => obs.observe(el));
+
+        // c. Scroll-spy nav
+        const sections = ["dashboard", "model-histori", "price-histori", "tentang"];
+        const navLinks = document.querySelectorAll(".nav-link");
+
+        function setActiveNav(id) {
+          navLinks.forEach((a) => {
+            const isActive = a.dataset.section === id;
+            a.classList.toggle("text-primary", isActive);
+            a.classList.toggle("border-primary", isActive);
+            a.classList.toggle("text-secondary", !isActive);
+            a.classList.toggle("border-transparent", !isActive);
+          });
+        }
+
+        const sectionObs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) setActiveNav(e.target.id);
+            });
+          },
+          { rootMargin: "-40% 0px -55% 0px", threshold: 0 },
+        );
+
+        sections.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) sectionObs.observe(el);
+        });
+
+        navLinks.forEach((a) => {
+          a.addEventListener("click", () => setActiveNav(a.dataset.section));
+        });
+      });
+    </script>
+  </body>
+</html>
