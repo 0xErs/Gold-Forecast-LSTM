@@ -24,7 +24,7 @@ EXPECTED_FEATURE_COLS = [
 import tensorflow as tf
 
 model = tf.keras.models.load_model(
-    os.path.join(MODEL_DIR, 'lstm_gold.keras'),
+    os.path.join(MODEL_DIR, 'lstm_gold.h5'),
     compile=False
 )
 
