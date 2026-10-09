@@ -24,7 +24,7 @@ EXPECTED_FEATURE_COLS = [
 import tensorflow as tf
 
 model = tf.keras.models.load_model(
-    os.path.join(MODEL_DIR, 'lstm_gold.keras'),
+    os.path.join(MODEL_DIR, 'lstm_gold.h5'),
     compile=False
 )
 
@@ -394,4 +394,5 @@ def model_history():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(debug=False, host='0.0.0.0', port=port)
