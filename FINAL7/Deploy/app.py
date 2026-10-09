@@ -2,7 +2,6 @@ import os
 import pickle
 import numpy as np
 import requests as _requests
-import pandas as _pd
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
 
@@ -12,7 +11,7 @@ _YF_HEADERS = {
 }
 
 def _yf_ohlcv(period='3mo', interval='1wk'):
-    url = f'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF'
+    url = 'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF'
     params = {'range': period, 'interval': interval, 'includePrePost': 'false'}
     r = _requests.get(url, params=params, headers=_YF_HEADERS, timeout=30)
     r.raise_for_status()
@@ -34,6 +33,26 @@ def _yf_ohlcv(period='3mo', interval='1wk'):
         })
     return rows
 
+def _sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+def _lstm_layer(X_seq, W, U, b, return_sequences=False):
+    units = W.shape[1] // 4
+    h = np.zeros(units)
+    c = np.zeros(units)
+    outputs = []
+    for t in range(X_seq.shape[0]):
+        z = X_seq[t] @ W + h @ U + b
+        i = _sigmoid(z[:units])
+        f = _sigmoid(z[units:2*units])
+        c_hat = np.tanh(z[2*units:3*units])
+        o = _sigmoid(z[3*units:])
+        c = f * c + i * c_hat
+        h = o * np.tanh(c)
+        if return_sequences:
+            outputs.append(h.copy())
+    return np.array(outputs) if return_sequences else h
+
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(MODEL_DIR, '.env')
 
@@ -52,12 +71,18 @@ EXPECTED_FEATURE_COLS = [
     'ret_this', 'ret_lag2',
 ]
 
-import tensorflow as tf
+_w = np.load(os.path.join(MODEL_DIR, 'lstm_weights.npz'))
+_lstm1_W, _lstm1_U, _lstm1_b = _w['lstm1_W'], _w['lstm1_U'], _w['lstm1_b']
+_lstm2_W, _lstm2_U, _lstm2_b = _w['lstm2_W'], _w['lstm2_U'], _w['lstm2_b']
+_dense_W, _dense_b           = _w['dense_W'], _w['dense_b']
 
-model = tf.keras.models.load_model(
-    os.path.join(MODEL_DIR, 'lstm_gold.h5'),
-    compile=False
-)
+def _model_predict(x_scaled):
+    h_seq   = _lstm_layer(x_scaled, _lstm1_W, _lstm1_U, _lstm1_b, return_sequences=True)
+    h_final = _lstm_layer(h_seq,    _lstm2_W, _lstm2_U, _lstm2_b, return_sequences=False)
+    return float(h_final @ _dense_W + _dense_b)
+
+def _batch_predict(X_seqs):
+    return np.array([_model_predict(x) for x in X_seqs])
 
 with open(os.path.join(MODEL_DIR, 'scaler_X.pkl'), 'rb') as f:
     scaler_X = pickle.load(f)
@@ -80,8 +105,6 @@ _ohlc_cache      = None
 _ohlc_cache_time = 0
 CACHE_TTL        = 300
 
-
-# ── Routes ──────────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -141,7 +164,6 @@ def build_feature_row(open_price, high_price, low_price, close_this, close_lag1,
                       close_lag2, ffr, ffr_prev, nfp):
     if close_lag1 <= 0 or close_lag2 <= 0:
         raise ValueError('Close Lag 1 dan Close Lag 2 harus lebih besar dari 0')
-
     ffr_chg = ffr - ffr_prev
     return np.array([[
         open_price / close_lag1,
@@ -159,35 +181,23 @@ def build_feature_row(open_price, high_price, low_price, close_this, close_lag1,
 def build_live_window(ohlc_sequence, ffr, ffr_prev, nfp):
     if not isinstance(ohlc_sequence, list):
         raise ValueError('ohlc_sequence harus berupa list candle mingguan')
-
     required_candles = window_size + 2
     if len(ohlc_sequence) < required_candles:
         raise ValueError(f'Data OHLC tidak cukup untuk sequence {window_size} minggu')
-
     rows = []
     candles = ohlc_sequence[-required_candles:]
     for i in range(2, len(candles)):
         candle = candles[i]
-        lag1 = candles[i - 1]
-        lag2 = candles[i - 2]
-
+        lag1   = candles[i - 1]
+        lag2   = candles[i - 2]
         row_ffr_prev = ffr_prev if i == len(candles) - 1 else ffr
-
         rows.append(build_feature_row(
-            float(candle['open']),
-            float(candle['high']),
-            float(candle['low']),
-            float(candle['close']),
-            float(lag1['close']),
-            float(lag2['close']),
-            ffr,
-            row_ffr_prev,
-            nfp,
+            float(candle['open']), float(candle['high']), float(candle['low']),
+            float(candle['close']), float(lag1['close']), float(lag2['close']),
+            ffr, row_ffr_prev, nfp,
         )[0])
-
     if len(rows) != window_size:
         raise ValueError(f'Ukuran sequence tidak sesuai: {len(rows)}')
-
     return np.array(rows, dtype=float), candles[-1], candles[-2], candles[-3]
 
 
@@ -196,41 +206,21 @@ def predict():
     try:
         data = request.get_json(force=True)
 
-        ffr       = float(data['ffr'])
-        ffr_prev  = float(data['ffr_prev'])
-        nfp       = float(data['nfp'])
+        ffr      = float(data['ffr'])
+        ffr_prev = float(data['ffr_prev'])
+        nfp      = float(data['nfp'])
         window_raw, current_candle, lag1_candle, lag2_candle = build_live_window(
-            data.get('ohlc_sequence'),
-            ffr,
-            ffr_prev,
-            nfp,
+            data.get('ohlc_sequence'), ffr, ffr_prev, nfp,
         )
 
-        open_price   = float(current_candle['open'])
-        high_price   = float(current_candle['high'])
-        low_price    = float(current_candle['low'])
         close_this   = float(current_candle['close'])
         close_prev   = float(lag1_candle['close'])
-        close_2w_ago = float(lag2_candle['close'])
-
-        print("\n" + "="*60)
-        print("DEBUG PREDICT - Raw Inputs:")
-        print(f"  open={open_price}, high={high_price}, low={low_price}")
-        print(f"  close={close_this}, close_lag1={close_prev}, close_lag2={close_2w_ago}")
-        print(f"  ffr={ffr}, ffr_prev={ffr_prev}, nfp={nfp}")
 
         window = scaler_X.transform(window_raw)
-
-        pred_scaled = model.predict(
-            window.reshape(1, window_size, n_features), verbose=0
-        )
-        pred_ratio = float(scaler_y.inverse_transform(pred_scaled)[0][0])
+        pred_scaled_val = _model_predict(window)
+        pred_ratio = float(scaler_y.inverse_transform([[pred_scaled_val]])[0][0])
         pred_price = close_prev * pred_ratio
 
-        print(f"DEBUG PREDICT - pred_ratio={pred_ratio:.6f}, pred_price=${pred_price:.2f}")
-        print("="*60 + "\n")
-
-        # Hitung arah: return dari lag1→pred diapply ke close_this
         lag1_to_pred_return = pred_price - close_prev
         adjusted_price      = close_this + lag1_to_pred_return
 
@@ -254,8 +244,6 @@ def predict():
     except Exception as e:
         return jsonify(status='error', message=str(e))
 
-
-# ── Model History (live backtest) ──────────────────────────────────────────
 
 @app.route('/model-history')
 def model_history():
@@ -301,35 +289,29 @@ def model_history():
         if len(df) < 10:
             return jsonify(status="error", message="Data tidak cukup setelah merge")
 
-        df["close_lag1"] = df["close"].shift(1)
-        df["close_lag2"] = df["close"].shift(2)
-        df["open_ratio"] = df["open"] / df["close_lag1"]
-        df["high_ratio"] = df["high"] / df["close_lag1"]
-        df["low_ratio"] = df["low"] / df["close_lag1"]
+        df["close_lag1"]  = df["close"].shift(1)
+        df["close_lag2"]  = df["close"].shift(2)
+        df["open_ratio"]  = df["open"] / df["close_lag1"]
+        df["high_ratio"]  = df["high"] / df["close_lag1"]
+        df["low_ratio"]   = df["low"]  / df["close_lag1"]
         df["range_ratio"] = (df["high"] - df["low"]) / df["close_lag1"]
-        df["ffr_chg"] = df["ffr"].diff().fillna(0)
-        df["ret_this"] = df["close"] / df["close_lag1"]
-        df["ret_lag2"] = df["close_lag1"] / df["close_lag2"]
-        df["y_ratio"] = df["close"].shift(-1) / df["close_lag1"]
-
+        df["ffr_chg"]     = df["ffr"].diff().fillna(0)
+        df["ret_this"]    = df["close"] / df["close_lag1"]
+        df["ret_lag2"]    = df["close_lag1"] / df["close_lag2"]
+        df["y_ratio"]     = df["close"].shift(-1) / df["close_lag1"]
         df = df.dropna().reset_index(drop=True)
 
         if len(df) < window_size + 1:
             return jsonify(status="error", message=f"Data terlalu sedikit ({len(df)} baris)")
 
-        X_raw = df[feature_cols].values
+        X_raw    = df[feature_cols].values
         X_scaled = scaler_X.transform(X_raw)
 
-        X_seq = []
-        for i in range(window_size, len(X_scaled)):
-            X_seq.append(X_scaled[i - window_size : i])
+        X_seqs = np.array([X_scaled[i - window_size:i] for i in range(window_size, len(X_scaled))])
+        pred_scaled_batch = _batch_predict(X_seqs)
+        pred_ratio = scaler_y.inverse_transform(pred_scaled_batch.reshape(-1, 1)).flatten()
 
-        X_seq = np.array(X_seq)
-
-        pred_scaled = model.predict(X_seq, verbose=0)
-        pred_ratio = scaler_y.inverse_transform(pred_scaled).flatten()
-
-        close_ref = df["close_lag1"].iloc[window_size - 1 :].values
+        close_ref = df["close_lag1"].iloc[window_size - 1:].values
 
         rows = []
         for i in range(len(pred_ratio)):
@@ -337,10 +319,9 @@ def model_history():
             pred_price = float(close_ref[i] * pred_ratio[i])
             abs_error = abs(pred_price - actual_close_next)
             abs_error_pct = (abs_error / actual_close_next * 100) if actual_close_next else 0
-            pred_dir = "Naik" if pred_ratio[i] > 1.0 else "Turun"
+            pred_dir   = "Naik" if pred_ratio[i] > 1.0 else "Turun"
             actual_dir = "Naik" if actual_close_next > float(close_ref[i]) else "Turun"
-            status = "Benar" if pred_dir == actual_dir else "Salah"
-
+            status     = "Benar" if pred_dir == actual_dir else "Salah"
             rows.append({
                 "date": str(df["date"].iloc[window_size + i].date()),
                 "close_lag1": round(float(close_ref[i]), 2),
@@ -353,23 +334,18 @@ def model_history():
                 "status": status,
             })
 
-        last_10 = rows[-10:]
-        total = len(last_10)
-        correct = sum(1 for r in last_10 if r["status"] == "Benar")
+        last_10  = rows[-10:]
+        total    = len(last_10)
+        correct  = sum(1 for r in last_10 if r["status"] == "Benar")
         accuracy = (correct / total * 100) if total else 0
-        mae = (sum(r["abs_error"] for r in last_10) / total) if total else 0
-        mape = (sum(r["abs_error_pct"] for r in last_10) / total) if total else 0
-        rmse = (sum(r["abs_error"] ** 2 for r in last_10) / total) ** 0.5 if total else 0
+        mae      = (sum(r["abs_error"] for r in last_10) / total) if total else 0
+        mape     = (sum(r["abs_error_pct"] for r in last_10) / total) if total else 0
+        rmse     = (sum(r["abs_error"] ** 2 for r in last_10) / total) ** 0.5 if total else 0
 
         return jsonify(
-            status="ok",
-            rows=last_10,
-            total=total,
-            correct=correct,
-            accuracy=round(accuracy, 2),
-            mae=round(mae, 2),
-            mape=round(mape, 2),
-            rmse=round(rmse, 2),
+            status="ok", rows=last_10, total=total, correct=correct,
+            accuracy=round(accuracy, 2), mae=round(mae, 2),
+            mape=round(mape, 2), rmse=round(rmse, 2),
         )
     except Exception as e:
         return jsonify(status="error", message=f"model-history error: {e}")
