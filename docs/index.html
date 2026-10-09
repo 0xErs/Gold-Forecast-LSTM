@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoldCast — Prediksi Harga Emas Berbasis Deep Learning & Makroekonomi</title>
+  <meta name="description" content="GoldCast menggunakan arsitektur LSTM dan indikator makroekonomi (Fed Funds Rate & Non-Farm Payrolls) untuk memprediksi arah pergerakan harga emas mingguan.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-subtle: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-soft: #94a3b8;
+      --accent: #d97706;
+      --accent-hover: #b45309;
+      --accent-light: #fef3c7;
+      --accent-glow: rgba(217, 119, 6, 0.12);
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-decoration: none;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--text);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #1e293b;
+      transform: translateY(-1px);
+    }
+    .btn-accent {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-accent:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      border-color: var(--border-strong);
+      color: var(--text);
+      background: #fff;
+    }
+    .btn-ghost:hover {
+      background: var(--bg-subtle);
+    }
+
+    /* Hero */
+    .hero {
+      padding: 96px 0 72px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--accent-light);
+      color: var(--accent-hover);
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      margin-bottom: 22px;
+      color: var(--text);
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      max-width: 660px;
+      margin: 0 auto 36px;
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      line-height: 1.65;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 56px;
+    }
+
+    /* Hero Preview Card */
+    .preview-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+      max-width: 860px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .preview-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .preview-meta {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+    }
+    .metric {
+      padding: 16px;
+      background: var(--bg-subtle);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .metric-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .metric-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+    .metric-value.up { color: #16a34a; }
+    .metric-foot {
+      font-size: 0.75rem;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    /* Section */
+    section { padding: 80px 0; }
+    .section-head {
+      text-align: center;
+      max-width: 620px;
+      margin: 0 auto 56px;
+    }
+    .section-head h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+    .section-head p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 28px;
+    }
+    .feature-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px;
+      transition: all 0.2s;
+    }
+    .feature-card:hover {
+      border-color: var(--border-strong);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 20px;
+      font-size: 1.25rem;
+    }
+    .feature-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.015em;
+    }
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    /* How It Works */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      position: relative;
+    }
+    .step {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .step-num {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .step h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .step p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    /* CTA Section */
+    .cta-section {
+      background: var(--bg-subtle);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      padding: 80px 0;
+    }
+    .cta-card {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .cta-card h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 14px;
+    }
+    .cta-card p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      margin-bottom: 32px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 48px 0;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 60px 0 40px; }
+      .preview-card { padding: 20px; }
+      section { padding: 50px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container nav">
+      <a href="#" class="brand">
+        <div class="brand-mark">G</div>
+        <span>GoldCast</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#fitur">Fitur</a></li>
+        <li><a href="#metode">Metodologi</a></li>
+        <li><a href="#arsitektur">Arsitektur</a></li>
+        <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+      <a href="https://app.gold-lstm.my.id" class="btn btn-primary" id="btn-launch">
+        Buka Dashboard →
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Model v1.0 Live & Terintegrasi Macro Data
+      </div>
+      <h1>
+        Prediksi Harga Emas Mingguan<br>
+        <span>Dengan Deep Learning & Makroekonomi</span>
+      </h1>
+      <p>
+        GoldCast menggabungkan Long Short-Term Memory (LSTM) dengan indikator makroekonomi global (Federal Funds Rate & Non-Farm Payrolls) untuk menghasilkan prediksi harga emas GC=F yang lebih akurat.
+      </p>
+      <div class="hero-actions">
+        <a href="https://app.gold-lstm.my.id" class="btn btn-accent btn-lg" id="btn-hero-launch">
+          Coba Prediksi Sekarang
+        </a>
+        <a href="#metode" class="btn btn-ghost">
+          Pelajari Metodologi
+        </a>
+      </div>
+
+      <!-- Live Mockup / Preview Card -->
+      <div class="preview-card">
+        <div class="preview-header">
+          <div>
+            <div class="preview-title">Contoh Output Prediksi (Gold Futures GC=F)</div>
+            <div class="preview-meta">Window Size: 4 Minggu · Multi-variate Ratio Target</div>
+          </div>
+          <span class="badge" style="margin: 0;">LSTM Inference &lt;1ms</span>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-label">Harga Penutupan Terakhir</div>
+            <div class="metric-value">$3,024.50</div>
+            <div class="metric-foot">Data OHLC GC=F Yahoo Finance</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Prediksi Minggu Depan</div>
+            <div class="metric-value up">$3,048.20</div>
+            <div class="metric-foot">+0.78% (Sinyal: Naik)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Fed Funds Rate (FFR)</div>
+            <div class="metric-value">4.58%</div>
+            <div class="metric-foot">FRED API (St. Louis Fed)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Non-Farm Payrolls (NFP)</div>
+            <div class="metric-value">+142K</div>
+            <div class="metric-foot">US Bureau of Labor Statistics</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fitur Utama -->
+  <section id="fitur">
+    <div class="container">
+      <div class="section-head">
+        <h2>Mengapa GoldCast Berbeda?</h2>
+        <p>Bukan sekadar regresi harga biasa. Model dirancang untuk menangkap interaksi antara tren teknikal emas dan kebijakan moneter global.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>Arsitektur Stacked LSTM</h3>
+          <p>Dua layer LSTM berurutan (24 units + 12 units) menangkap dependensi waktu jangka pendek dan jangka menengah dalam pergerakan harga emas mingguan.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Integrasi Makroekonomi Riil</h3>
+          <p>Menggunakan data resmi Federal Reserve (FRED) untuk Fed Funds Rate dan Non-Farm Payrolls yang secara fundamental menggerakkan likuiditas dan nilai tukar USD.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">📐</div>
+          <h3>Target Prediksi Berbasis Rasio</h3>
+          <p>Memprediksi rasio harga (close_next / close_lag1) alih-alih nilai absolut. Mengurangi sensitivitas model terhadap non-stasioneritas data harga time series.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Inference Ultra Ringan</h3>
+          <p>Forward pass LSTM diimplementasikan dengan pure NumPy (22KB weights). Tidak memerlukan TensorFlow runtime berat, response time dalam milidetik.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3>Auto-Fetch Data Terbaru</h3>
+          <p>Mengambil data candle OHLC mingguan langsung dari Yahoo Finance API secara otomatis. Tanpa perlu input manual yang merepotkan.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">📈</div>
+          <h3>Backtest Riil 10 Minggu</h3>
+          <p>Dashboard menyertakan tabel evaluasi performa model pada data historis terbaru lengkap dengan MAE, MAPE, dan akurasi arah (direction accuracy).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Metodologi -->
+  <section id="metode" style="background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-head">
+        <h2>Alur Kerja Sistem</h2>
+        <p>Proses data dari pasar global hingga menghasilkan prediksi harga akhir.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">TAHAP 01</div>
+          <h4>Ingesti Data Pasar</h4>
+          <p>Candle mingguan emas (GC=F) ditarik otomatis, meliputi harga Open, High, Low, Close, dan Volume transaksi.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">TAHAP 02</div>
+          <h4>Sinkronisasi Makro</h4>
+          <p>Nilai FFR dan perubahan NFP dari FRED diselaraskan secara temporal dengan candle mingguan menggunakan backward as-of merge.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">TAHAP 03</div>
+          <h4>Feature Engineering</h4>
+          <p>Membentuk 9 fitur rasio dinamis (open/lag1, high/lag1, low/lag1, range/lag1, ffr, ffr_chg, nfp, ret_this, ret_lag2).</p>
+        </div>
+        <div class="step">
+          <div class="step-num">TAHAP 04</div>
+          <h4>LSTM Inference</h4>
+          <p>Sequence 4 minggu diskalakan via MinMaxScaler, diproses lewat jaringan LSTM, dan di-denormalisasi menjadi proyeksi harga final.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-card">
+        <h2>Mulai Eksplorasi Prediksi Sekarang</h2>
+        <p>Buka dashboard interaktif untuk mencoba prediksi harga emas terkini atau uji skenario nilai suku bunga dan tenaga kerja yang berbeda.</p>
+        <a href="https://app.gold-lstm.my.id" class="btn btn-accent btn-lg" style="padding: 14px 28px; font-size: 1rem;">
+          Buka Dashboard GoldCast →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-inner">
+      <div>
+        <strong>GoldCast</strong> — Penelitian & Model Forecasting Emas LSTM
+      </div>
+      <div>
+        Proyek Skripsi / Proposal Penelitian · Open Source di <a href="https://github.com/0xErs/Gold-Forecast-LSTM" style="color: var(--text); text-decoration: underline;">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Fallback: jika subdomain app.gold-lstm.my.id belum disetup,
+    // arahkan sementara ke URL render langsung
+    const RENDER_FALLBACK = "https://gold-forecast-lstm-1.onrender.com";
+    const APP_DOMAIN = "https://app.gold-lstm.my.id";
+
+    // Ubah link jika lu mau langsung ke render dulu
+    // document.getElementById('btn-launch').href = RENDER_FALLBACK;
+    // document.getElementById('btn-hero-launch').href = RENDER_FALLBACK;
+  </script>
+</body>
+</html>
