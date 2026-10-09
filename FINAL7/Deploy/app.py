@@ -1,7 +1,38 @@
 import os
 import pickle
 import numpy as np
+import requests as _requests
+import pandas as _pd
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
+
+_YF_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/json',
+}
+
+def _yf_ohlcv(period='3mo', interval='1wk'):
+    url = f'https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF'
+    params = {'range': period, 'interval': interval, 'includePrePost': 'false'}
+    r = _requests.get(url, params=params, headers=_YF_HEADERS, timeout=30)
+    r.raise_for_status()
+    chart = r.json()['chart']['result'][0]
+    timestamps = chart['timestamp']
+    q = chart['indicators']['quote'][0]
+    rows = []
+    for i, ts in enumerate(timestamps):
+        o, h, l, c, v = q['open'][i], q['high'][i], q['low'][i], q['close'][i], q['volume'][i]
+        if None in (o, h, l, c):
+            continue
+        rows.append({
+            'date': datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d'),
+            'open': round(float(o), 2),
+            'high': round(float(h), 2),
+            'low':  round(float(l), 2),
+            'close': round(float(c), 2),
+            'volume': int(v) if v is not None else 0,
+        })
+    return rows
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(MODEL_DIR, '.env')
@@ -64,54 +95,27 @@ def auto_ohlc():
         if _ohlc_cache and (_time.time() - _ohlc_cache_time) < CACHE_TTL:
             return jsonify(**_ohlc_cache)
 
-        import yfinance as yf
-        ticker = yf.Ticker('GC=F')
-        hist   = ticker.history(period='3mo', interval='1wk')
-        hist   = hist[['Open', 'High', 'Low', 'Close', 'Volume']].dropna().sort_index()
+        rows = _yf_ohlcv(period='3mo', interval='1wk')
         required_candles = window_size + 2
-        if len(hist) < required_candles:
-            return jsonify(status='error', message=f'Data tidak cukup dari yfinance (butuh minimal {required_candles} minggu)')
+        if len(rows) < required_candles:
+            return jsonify(status='error', message=f'Data tidak cukup dari Yahoo Finance (butuh minimal {required_candles} minggu, dapat {len(rows)})')
 
-        sequence = []
-        sequence_rows = hist.iloc[-required_candles:]
-        for i in range(len(sequence_rows)):
-            row = sequence_rows.iloc[i]
-            sequence.append({
-                'date':   sequence_rows.index[i].strftime('%Y-%m-%d'),
-                'open':   round(float(row['Open']), 2),
-                'high':   round(float(row['High']), 2),
-                'low':    round(float(row['Low']), 2),
-                'close':  round(float(row['Close']), 2),
-                'volume': int(row['Volume']),
-            })
-
-        history      = []
-        history_rows = hist.iloc[-6:-1]
-        for i in range(len(history_rows)):
-            row = history_rows.iloc[i]
-            history.append({
-                'date':   history_rows.index[i].strftime('%Y-%m-%d'),
-                'open':   round(float(row['Open']), 2),
-                'high':   round(float(row['High']), 2),
-                'low':    round(float(row['Low']), 2),
-                'close':  round(float(row['Close']), 2),
-                'volume': int(row['Volume']),
-            })
-
-        current = hist.iloc[-1]
-        lag1    = history_rows.iloc[-1]
-        lag2    = history_rows.iloc[-2]
+        sequence = rows[-required_candles:]
+        history  = rows[-6:-1]
+        current  = rows[-1]
+        lag1     = rows[-2]
+        lag2     = rows[-3]
 
         result = dict(
             status='ok',
-            date=current.name.strftime('%Y-%m-%d'),
-            open=round(float(current['Open']), 2),
-            high=round(float(current['High']), 2),
-            low=round(float(current['Low']), 2),
-            close=round(float(current['Close']), 2),
-            volume=int(current['Volume']),
-            close_lag1=round(float(lag1['Close']), 2),
-            close_lag2=round(float(lag2['Close']), 2),
+            date=current['date'],
+            open=current['open'],
+            high=current['high'],
+            low=current['low'],
+            close=current['close'],
+            volume=current['volume'],
+            close_lag1=lag1['close'],
+            close_lag2=lag2['close'],
             ohlc_sequence=sequence,
             history=history,
         )
@@ -120,31 +124,13 @@ def auto_ohlc():
 
         return jsonify(**result)
     except Exception as e:
-        return jsonify(status='error', message=f'yfinance error: {e}')
+        return jsonify(status='error', message=f'Yahoo Finance error: {e}')
 
 
 @app.route('/price-history')
 def price_history():
-    """Auto-fetch price history with volume for the price history table."""
     try:
-        import yfinance as yf
-        ticker = yf.Ticker('GC=F')
-        hist   = ticker.history(period='6mo', interval='1wk')
-        hist   = hist[['Open', 'High', 'Low', 'Close', 'Volume']].dropna().sort_index()
-
-        rows = []
-        for i in range(len(hist)):
-            row = hist.iloc[i]
-            rows.append({
-                'date':    hist.index[i].strftime('%Y-%m-%d'),
-                'open':    round(float(row['Open']), 2),
-                'high':    round(float(row['High']), 2),
-                'low':     round(float(row['Low']), 2),
-                'close':   round(float(row['Close']), 2),
-                'volume':  int(row['Volume']),
-            })
-
-        # Most recent first, only last 10 weeks
+        rows = _yf_ohlcv(period='6mo', interval='1wk')
         rows.reverse()
         return jsonify(status='ok', rows=rows[:10])
     except Exception as e:
@@ -274,8 +260,6 @@ def predict():
 @app.route('/model-history')
 def model_history():
     try:
-        import yfinance as yf
-        import requests
         import pandas as pd
 
         FRED_API_KEY = os.environ.get('FRED_API_KEY')
@@ -285,21 +269,19 @@ def model_history():
         def get_fred_series(series_id, start="2024-01-01"):
             url = "https://api.stlouisfed.org/fred/series/observations"
             params = {"series_id": series_id, "api_key": FRED_API_KEY, "file_type": "json", "observation_start": start}
-            r = requests.get(url, params=params, timeout=30)
+            r = _requests.get(url, params=params, timeout=30)
             r.raise_for_status()
             df = pd.DataFrame(r.json()["observations"])
             df["date"] = pd.to_datetime(df["date"])
             df["value"] = pd.to_numeric(df["value"], errors="coerce")
             return df[["date", "value"]].dropna().sort_values("date").reset_index(drop=True)
 
-        ticker = yf.Ticker("GC=F")
-        ohlc = ticker.history(period="8mo", interval="1wk")[["Open", "High", "Low", "Close"]].dropna().sort_index()
-        if len(ohlc) < 20:
-            return jsonify(status="error", message="Data yfinance tidak cukup")
+        raw_rows = _yf_ohlcv(period='8mo', interval='1wk')
+        if len(raw_rows) < 20:
+            return jsonify(status="error", message="Data Yahoo Finance tidak cukup")
 
-        ohlc_df = ohlc.reset_index()
-        ohlc_df.columns = ["date", "open", "high", "low", "close"]
-        ohlc_df["date"] = pd.to_datetime(ohlc_df["date"]).dt.tz_localize(None)
+        ohlc_df = pd.DataFrame(raw_rows)
+        ohlc_df["date"] = pd.to_datetime(ohlc_df["date"])
 
         ffr_raw = get_fred_series("DFEDTARU")
         ffr = ffr_raw.rename(columns={"value": "ffr"})
