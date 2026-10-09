@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: gold-lstm
+    env: python
+    region: singapore
+    buildCommand: "cd FINAL7/Deploy && pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "cd FINAL7/Deploy && gunicorn app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FRED_API_KEY
+        sync: false
