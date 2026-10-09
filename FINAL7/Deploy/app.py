@@ -101,9 +101,12 @@ if feature_cols != EXPECTED_FEATURE_COLS:
 app = Flask(__name__)
 
 import time as _time
-_ohlc_cache      = None
-_ohlc_cache_time = 0
-CACHE_TTL        = 300
+_ohlc_cache          = None
+_ohlc_cache_time     = 0
+_history_cache       = None
+_history_cache_time  = 0
+CACHE_TTL            = 300
+HISTORY_CACHE_TTL    = 600
 
 
 @app.route('/')
@@ -247,7 +250,11 @@ def predict():
 
 @app.route('/model-history')
 def model_history():
+    global _history_cache, _history_cache_time
     try:
+        if _history_cache and (_time.time() - _history_cache_time) < HISTORY_CACHE_TTL:
+            return jsonify(**_history_cache)
+
         import pandas as pd
 
         FRED_API_KEY = os.environ.get('FRED_API_KEY')
@@ -311,7 +318,7 @@ def model_history():
         pred_scaled_batch = _batch_predict(X_seqs)
         pred_ratio = scaler_y.inverse_transform(pred_scaled_batch.reshape(-1, 1)).flatten()
 
-        close_ref = df["close_lag1"].iloc[window_size - 1:].values
+        close_ref = df["close_lag1"].iloc[window_size:].values
 
         rows = []
         for i in range(len(pred_ratio)):
@@ -342,11 +349,14 @@ def model_history():
         mape     = (sum(r["abs_error_pct"] for r in last_10) / total) if total else 0
         rmse     = (sum(r["abs_error"] ** 2 for r in last_10) / total) ** 0.5 if total else 0
 
-        return jsonify(
+        res_data = dict(
             status="ok", rows=last_10, total=total, correct=correct,
             accuracy=round(accuracy, 2), mae=round(mae, 2),
             mape=round(mape, 2), rmse=round(rmse, 2),
         )
+        _history_cache      = res_data
+        _history_cache_time = _time.time()
+        return jsonify(**res_data)
     except Exception as e:
         return jsonify(status="error", message=f"model-history error: {e}")
 
