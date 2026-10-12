@@ -5,11 +5,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>GoldPredict AI | Institutional Research Terminal</title>
     <!-- =====================================================================
-         External dependencies
-         · Tailwind CDN (with forms + container-queries plugins)
+         Styles
+         · Tailwind CSS — compiled locally to static/css/tailwind.css
+           (no runtime CDN dependency; rebuild with: npm run build:css)
          · Google Fonts: Inter (UI), Material Symbols (icons)
          ===================================================================== -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
@@ -23,76 +24,10 @@
          Only includes tokens actually USED in this template. If you add a
          new utility (e.g. text-info), declare its color here first.
          ===================================================================== -->
-    <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              // Brand & semantic
-              primary: "#000000",
-              "on-primary": "#ffffff",
-              secondary: "#585f6c",
-              tertiary: "#c99a2e", // gold accent
-              success: "#16a34a",
-
-              // Surfaces (light theme)
-              surface: "#ffffff",
-              "surface-bright": "#f9f9f9",
-              "surface-container-lowest": "#ffffff",
-              "surface-container-low": "#f3f3f3",
-              "surface-container": "#eeeeee",
-              "surface-container-high": "#e8e8e8",
-              "surface-variant": "#e2e2e2",
-
-              // Lines & text-on-surface
-              outline: "#747878",
-              "outline-variant": "#c4c7c7",
-              "on-surface": "#1a1c1c",
-              "on-surface-variant": "#444748",
-            },
-            borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem" },
-            spacing: {
-              gutter: "24px",
-              "margin-desktop": "32px",
-              "margin-mobile": "16px",
-              "container-max-width": "1440px",
-            },
-            // All UI text uses Inter; aliases below let us name roles
-            // (headline / body / label / numeric) in HTML instead of sizes.
-            fontFamily: {
-              "headline-xl": ["Inter"],
-              "headline-lg": ["Inter"],
-              "headline-md": ["Inter"],
-              "body-lg": ["Inter"],
-              "body-md": ["Inter"],
-              "body-sm": ["Inter"],
-              "label-caps": ["Inter"],
-              "numeric-tabular": ["Inter"],
-            },
-            fontSize: {
-              "headline-xl": [
-                "36px",
-                { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" },
-              ],
-              "headline-lg": [
-                "24px",
-                { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" },
-              ],
-              "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
-              "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
-              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
-              "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
-              "label-caps": [
-                "11px",
-                { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" },
-              ],
-              "numeric-tabular": ["14px", { lineHeight: "20px", fontWeight: "500" }],
-            },
-          },
-        },
-      };
-    </script>
+    <!-- =====================================================================
+         Tailwind theme tokens live in tailwind.config.js now.
+         The compiled stylesheet is static/css/tailwind.css.
+         ===================================================================== -->
     <style>
       /* =====================================================================
          1. Base
@@ -101,7 +36,14 @@
         background-color: #f5f5f5;
         font-family: "Inter", sans-serif;
         color: #1a1c1c;
+        overflow-x: hidden;
       }
+
+      /* Guard against horizontal overflow on small screens */
+      img, svg, canvas { max-width: 100%; }
+
+      /* Responsive safety net for wide data tables (mobile scroll) */
+      .overflow-x-auto { -webkit-overflow-scrolling: touch; }
 
       /* Material Symbols default styling */
       .material-symbols-outlined {
@@ -275,18 +217,31 @@
          Sticky brand + section anchors. Scroll-spy highlights active link.
          ===================================================================== -->
     <header
-      class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-desktop bg-surface border-b border-outline-variant h-16"
+      class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop bg-surface border-b border-outline-variant h-16"
     >
-      <div class="flex items-center gap-3 font-headline-lg text-headline-lg font-bold text-primary">
-        <div class="h-8 w-auto flex items-center">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="h-8 w-auto flex items-center shrink-0">
           <img
             alt="XAU/USD Logo"
             class="h-full w-auto"
             src="{{ url_for('static', filename='logo web.svg') }}"
           />
         </div>
-        <span>Prediksi Harga Emas Mingguan</span>
+        <span class="font-headline-md md:font-headline-lg text-headline-md md:text-headline-lg font-bold text-primary truncate"
+          >Prediksi Harga Emas Mingguan</span
+        >
       </div>
+
+      <!-- Mobile menu toggle -->
+      <button
+        id="mobile-menu-btn"
+        class="md:hidden flex items-center justify-center w-10 h-10 -mr-1 text-primary"
+        aria-label="Buka menu navigasi"
+        aria-expanded="false"
+      >
+        <span class="material-symbols-outlined" id="mobile-menu-icon">menu</span>
+      </button>
+
       <nav class="hidden md:flex items-center gap-8" id="main-nav">
         <a
           class="nav-link font-body-md text-body-md text-primary border-b-2 border-primary pb-1 transition-colors"
@@ -314,6 +269,34 @@
         >
       </nav>
     </header>
+
+    <!-- Mobile nav dropdown -->
+    <nav
+      id="mobile-nav"
+      class="hidden md:hidden sticky top-16 z-40 flex-col bg-surface border-b border-outline-variant"
+    >
+      <a
+        class="mobile-nav-link px-margin-mobile py-4 font-body-md text-body-md text-primary border-b border-outline-variant"
+        href="#dashboard"
+
+        >Dashboard</a
+      >
+      <a
+        class="mobile-nav-link px-margin-mobile py-4 font-body-md text-body-md text-secondary border-b border-outline-variant"
+        href="#model-histori"
+        >Model Histori</a
+      >
+      <a
+        class="mobile-nav-link px-margin-mobile py-4 font-body-md text-body-md text-secondary border-b border-outline-variant"
+        href="#price-histori"
+        >Price Histori</a
+      >
+      <a
+        class="mobile-nav-link px-margin-mobile py-4 font-body-md text-body-md text-secondary"
+        href="#tentang"
+        >Tentang</a
+      >
+    </nav>
 
     <div class="flex flex-1">
       <main
@@ -1250,6 +1233,28 @@
         // a. Initial data
         loadPriceHistory();
         loadModelHistory();
+
+        // Mobile nav toggle
+        const mobileBtn = document.getElementById("mobile-menu-btn");
+        const mobileNav = document.getElementById("mobile-nav");
+        const mobileIcon = document.getElementById("mobile-menu-icon");
+        if (mobileBtn && mobileNav) {
+          mobileBtn.addEventListener("click", () => {
+            const isOpen = !mobileNav.classList.contains("hidden");
+            mobileNav.classList.toggle("hidden");
+            mobileNav.classList.toggle("flex");
+            mobileIcon.textContent = isOpen ? "menu" : "close";
+            mobileBtn.setAttribute("aria-expanded", String(!isOpen));
+          });
+          mobileNav.querySelectorAll(".mobile-nav-link").forEach((link) => {
+            link.addEventListener("click", () => {
+              mobileNav.classList.add("hidden");
+              mobileNav.classList.remove("flex");
+              mobileIcon.textContent = "menu";
+              mobileBtn.setAttribute("aria-expanded", "false");
+            });
+          });
+        }
 
         // b. Scroll-reveal
         const obs = new IntersectionObserver(

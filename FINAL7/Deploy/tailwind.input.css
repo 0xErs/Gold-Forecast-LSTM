@@ -1,0 +1,4 @@
+/** Input for Tailwind CLI build. Compiled to static/css/tailwind.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

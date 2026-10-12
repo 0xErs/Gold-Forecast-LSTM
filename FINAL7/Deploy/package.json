@@ -1,0 +1,13 @@
+{
+  "name": "goldcast-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GoldCast — LSTM gold price forecasting dashboard (Flask backend + compiled Tailwind frontend)",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i tailwind.input.css -o static/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i tailwind.input.css -o static/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}
