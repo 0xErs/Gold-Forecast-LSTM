@@ -387,6 +387,94 @@
       color: var(--text-muted);
     }
 
+    /* Pricing */
+    .pricing-section {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+    .pricing-card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s;
+    }
+    .pricing-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+    .pricing-card.featured {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 20px 40px -20px rgba(34, 197, 94, 0.4);
+    }
+    .pricing-tag {
+      position: absolute;
+      top: -12px;
+      left: 32px;
+      background: var(--accent);
+      color: #000;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+    .pricing-name {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .pricing-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .pricing-price span {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .pricing-desc {
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 32px;
+      flex: 1;
+    }
+    .pricing-features li {
+      position: relative;
+      padding-left: 26px;
+      margin-bottom: 12px;
+      font-size: 0.9375rem;
+      color: var(--text);
+    }
+    .pricing-features li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .pricing-btn {
+      width: 100%;
+    }
+
     /* CTA */
     .cta-section {
       background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
@@ -485,7 +573,7 @@
         <li><a href="#features">Features</a></li>
         <li><a href="#architecture">Architecture</a></li>
         <li><a href="#performance">Performance</a></li>
-        <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="#pricing">Pricing</a></li>
       </ul>
       <a href="https://app.gold-lstm.my.id" class="btn btn-accent">
         Launch Dashboard
@@ -513,8 +601,8 @@
             <a href="https://app.gold-lstm.my.id" class="btn btn-accent">
               Try Live Dashboard
             </a>
-            <a href="https://github.com/0xErs/Gold-Forecast-LSTM" class="btn btn-ghost" target="_blank" rel="noopener">
-              View on GitHub
+            <a href="#architecture" class="btn btn-ghost">
+              See How It Works
             </a>
           </div>
         </div>
@@ -665,6 +753,58 @@
     </div>
   </section>
 
+  <!-- Pricing -->
+  <section id="pricing" class="pricing-section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Simple, Transparent Pricing</h2>
+        <p>Start free with the live dashboard. Scale to API access when you're ready.</p>
+      </div>
+
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-name">Explorer</div>
+          <div class="pricing-price">$0<span>/mo</span></div>
+          <p class="pricing-desc">For individual traders evaluating the model.</p>
+          <ul class="pricing-features">
+            <li>Live weekly forecast dashboard</li>
+            <li>Auto-fetch OHLC & macro data</li>
+            <li>10-week rolling backtest</li>
+            <li>Community support</li>
+          </ul>
+          <a href="https://app.gold-lstm.my.id" class="btn btn-ghost pricing-btn">Launch Dashboard</a>
+        </div>
+
+        <div class="pricing-card featured">
+          <div class="pricing-tag">Most Popular</div>
+          <div class="pricing-name">Quant API</div>
+          <div class="pricing-price">$49<span>/mo</span></div>
+          <p class="pricing-desc">For algorithmic strategies and automated desks.</p>
+          <ul class="pricing-features">
+            <li>REST API — 10,000 calls/mo</li>
+            <li>Sub-millisecond inference</li>
+            <li>Historical forecast archive</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="https://app.gold-lstm.my.id" class="btn btn-accent pricing-btn">Get API Access</a>
+        </div>
+
+        <div class="pricing-card">
+          <div class="pricing-name">Institutional</div>
+          <div class="pricing-price">Custom</div>
+          <p class="pricing-desc">For funds and desks requiring dedicated infrastructure.</p>
+          <ul class="pricing-features">
+            <li>Unlimited API calls</li>
+            <li>Private model deployment</li>
+            <li>Custom feature engineering</li>
+            <li>Dedicated SLA & support</li>
+          </ul>
+          <a href="https://app.gold-lstm.my.id" class="btn btn-ghost pricing-btn">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section class="cta-section">
     <div class="container">
@@ -675,8 +815,8 @@
           <a href="https://app.gold-lstm.my.id" class="btn btn-accent" style="padding: 14px 28px; font-size: 1rem;">
             Launch Dashboard →
           </a>
-          <a href="https://github.com/0xErs/Gold-Forecast-LSTM" class="btn btn-ghost" style="padding: 14px 28px; font-size: 1rem;" target="_blank" rel="noopener">
-            View Documentation
+          <a href="#architecture" class="btn btn-ghost" style="padding: 14px 28px; font-size: 1rem;">
+            See How It Works
           </a>
         </div>
       </div>
@@ -691,16 +831,17 @@
           <h4>Product</h4>
           <ul>
             <li><a href="https://app.gold-lstm.my.id">Dashboard</a></li>
-            <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM#api-reference">API Docs</a></li>
-            <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM#model-architecture">Model Details</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#architecture">Model Architecture</a></li>
+            <li><a href="#performance">Performance</a></li>
           </ul>
         </div>
         <div class="footer-col">
           <h4>Resources</h4>
           <ul>
-            <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM">GitHub Repository</a></li>
-            <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM/issues">Issue Tracker</a></li>
-            <li><a href="https://github.com/0xErs/Gold-Forecast-LSTM/blob/main/README.md">README</a></li>
+            <li><a href="#architecture">How It Works</a></li>
+            <li><a href="#features">Capabilities</a></li>
+            <li><a href="#performance">Backtest Metrics</a></li>
           </ul>
         </div>
         <div class="footer-col">
@@ -725,7 +866,7 @@
           <strong>GoldCast</strong> — Enterprise Gold Forecasting Platform
         </div>
         <div>
-          Open Source under MIT License · <a href="https://github.com/0xErs/Gold-Forecast-LSTM" style="color: var(--text-muted); text-decoration: underline;">GitHub</a>
+          © 2026 GoldCast. Not investment advice.
         </div>
       </div>
     </div>

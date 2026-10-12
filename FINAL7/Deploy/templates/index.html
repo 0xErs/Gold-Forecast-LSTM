@@ -170,9 +170,27 @@
 
       /* =====================================================================
          4. Animations
-         Wrapped in prefers-reduced-motion so users who opt out of motion
-         get a static UI (card hover & fade-ins disabled).
+         Fade-ins are opt-in via JS (body gets .js-anim once running), so the
+         page is always readable even if JS or the animation never runs.
+         All motion is skipped for prefers-reduced-motion users.
          ===================================================================== */
+      @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      /* Only hide-then-animate when JS is confirmed running */
+      body.js-anim .animate-fade-up {
+        animation: fade-in-up 0.6s ease-out forwards;
+        opacity: 0;
+      }
+      body.js-anim .scroll-reveal {
+        opacity: 0;
+      }
+      body.js-anim .scroll-reveal.visible {
+        animation: fade-in-up 0.6s ease-out forwards;
+        opacity: 1;
+      }
+
       @media (prefers-reduced-motion: no-preference) {
         .academic-card:hover {
           border-color: #c99a2e;
@@ -181,14 +199,6 @@
             0 10px 25px -5px rgba(0, 0, 0, 0.1),
             0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
-        @keyframes fade-in-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-up {
-          animation: fade-in-up 0.6s ease-out forwards;
-          opacity: 0;
-        }
         @keyframes pulse-soft {
           0%, 100% { opacity: 1;   transform: scale(1); }
           50%      { opacity: 0.8; transform: scale(1.05); }
@@ -196,11 +206,19 @@
         .animate-pulse-soft {
           animation: pulse-soft 2s infinite ease-in-out;
         }
-        .scroll-reveal {
-          opacity: 0;
+      }
+
+      /* Reduced motion: kill all animation, keep everything visible */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
         }
-        .scroll-reveal.visible {
-          animation: fade-in-up 0.6s ease-out forwards;
+        body.js-anim .animate-fade-up,
+        body.js-anim .scroll-reveal {
+          opacity: 1 !important;
+          animation: none !important;
         }
       }
       @keyframes spin {
@@ -1230,6 +1248,9 @@
       //      c. Scroll-spy that highlights the active nav link by section
       // ─────────────────────────────────────────────────────────────────────
       document.addEventListener("DOMContentLoaded", () => {
+        // Enable reveal animations only once JS is running (progressive enhancement)
+        document.body.classList.add("js-anim");
+
         // a. Initial data
         loadPriceHistory();
         loadModelHistory();
